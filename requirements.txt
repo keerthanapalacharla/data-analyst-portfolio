@@ -1,6 +1,8 @@
 streamlit
-google-genai
 pandas
 numpy
-python-dotenv
 plotly
+pillow
+google-genai
+opencv-python-headless
+mediapipe==0.10.9
