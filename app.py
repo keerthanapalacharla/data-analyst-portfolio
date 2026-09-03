@@ -114,6 +114,23 @@ if api_key:
         http_options=types.HttpOptions(api_version="v1beta")
     )
 
+def safe_generate_content(client, model, contents, max_retries=3):
+    """
+    Executes generate_content with exponential backoff to recover from 503 server demand spikes.
+    """
+    for attempt in range(max_retries):
+        try:
+            return client.models.generate_content(
+                model=model,
+                contents=contents
+            )
+        except Exception as e:
+            err_msg = str(e)
+            if ("503" in err_msg or "UNAVAILABLE" in err_msg or "high demand" in err_msg) and attempt < max_retries - 1:
+                time.sleep((2 ** attempt) + 1)  # Delays: 2s, 3s, 5s
+                continue
+            raise e
+
 # Sidebar Setup
 with st.sidebar:
     st.image("https://api.iconify.design/noto:pregnant-woman-light-skin-tone.svg", width=70)
@@ -141,7 +158,7 @@ with st.sidebar:
     else:
         st.warning("⚠️ MediaPipe Fallback Mode")
         
-    st.caption("Powered by Gemini 3.6 Flash")
+    st.caption("Powered by Gemini 1.5 Flash")
 
 # Hero Banner
 st.markdown("""
@@ -204,8 +221,9 @@ with tab1:
                         
                         User reflection: "{user_input}"
                         """
-                        response = client.models.generate_content(
-                            model="gemini-3.6-flash", 
+                        response = safe_generate_content(
+                            client=client,
+                            model="gemini-1.5-flash", 
                             contents=prompt
                         )
                         st.markdown(f"""
@@ -215,7 +233,10 @@ with tab1:
                         </div>
                         """, unsafe_allow_html=True)
                     except Exception as e:
-                        st.error(f"Error calling Gemini API: {str(e)}")
+                        if "503" in str(e) or "UNAVAILABLE" in str(e):
+                            st.warning("🌸 The AI service is experiencing high demand right now. Please wait a moment and click 'RUN CBT SENTIMENT ANALYSIS' again.")
+                        else:
+                            st.error(f"Error calling Gemini API: {str(e)}")
 
 # ---------------------------------------------------------
 # Tab 2: Physical Recovery & Posture (STABLE CAMERA CAPTURE)
@@ -318,8 +339,9 @@ with tab2:
                             4. **Correction Steps**: Give 2 actionable posture adjustments to improve execution.
                             """
                             
-                            eval_response = client.models.generate_content(
-                                model="gemini-3.6-flash",
+                            eval_response = safe_generate_content(
+                                client=client,
+                                model="gemini-1.5-flash",
                                 contents=[image_part, prompt]
                             )
                             
@@ -338,7 +360,7 @@ with tab2:
                 st.video(uploaded_video)
                 if st.button(f"ANALYZE {selected_ex.upper()} VIDEO"):
                     if client:
-                        with st.spinner("Analyzing motion with Gemini 3.6 Flash..."):
+                        with st.spinner("Analyzing motion with Gemini..."):
                             try:
                                 video_bytes = uploaded_video.getvalue()
                                 mime_type = uploaded_video.type or "video/mp4"
@@ -353,8 +375,9 @@ with tab2:
                                 3. **2 Specific Safety & Performance Feedback Points**
                                 """
                                 
-                                video_analysis = client.models.generate_content(
-                                    model="gemini-3.6-flash",
+                                video_analysis = safe_generate_content(
+                                    client=client,
+                                    model="gemini-1.5-flash",
                                     contents=[video_part, prompt]
                                 )
                                 
